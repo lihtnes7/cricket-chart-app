@@ -1,97 +1,63 @@
-import streamlit as st
-import pandas as pd
-import matplotlib.pyplot as plt
-from collections import defaultdict
+import streamlit as st import pandas as pd import sqlite3
 
-st.set_page_config(page_title="Cricket Tracker", layout="wide")
-st.title("🏏 Cricket Stats Tracker: Batsman vs Bowler")
+--- Database setup ---
 
-CATEGORIES = ["Beaten", "Wicket", "Pace Wide", "Spin Wide", "No Ball"]
+conn = sqlite3.connect("cricket_stats.db", check_same_thread=False) cursor = conn.cursor()
 
-# Persistent session state
-if "stats" not in st.session_state:
-    st.session_state.stats = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
-if "batsmen" not in st.session_state:
-    st.session_state.batsmen = []
-if "bowlers" not in st.session_state:
-    st.session_state.bowlers = []
+Create tables
 
-# Add Batsman
-st.sidebar.header("➕ Add Batsman")
-new_batsman = st.sidebar.text_input("Batsman Name", key="batsman_input")
-if st.sidebar.button("Add Batsman") and new_batsman:
-    if new_batsman not in st.session_state.batsmen:
-        st.session_state.batsmen.append(new_batsman.strip())
+cursor.execute(''' CREATE TABLE IF NOT EXISTS players ( name TEXT PRIMARY KEY, type TEXT CHECK(type IN ('batsman', 'bowler')) ) ''')
 
-# Add Bowler
-st.sidebar.header("➕ Add Bowler")
-new_bowler = st.sidebar.text_input("Bowler Name", key="bowler_input")
-if st.sidebar.button("Add Bowler") and new_bowler:
-    if new_bowler not in st.session_state.bowlers:
-        st.session_state.bowlers.append(new_bowler.strip())
+cursor.execute(''' CREATE TABLE IF NOT EXISTS stats ( batsman TEXT, bowler TEXT, beaten INTEGER DEFAULT 0, wicket INTEGER DEFAULT 0, pace_wide INTEGER DEFAULT 0, spin_wide INTEGER DEFAULT 0, no_ball INTEGER DEFAULT 0, PRIMARY KEY (batsman, bowler) ) ''')
 
-# Guard Clause
-if not st.session_state.batsmen or not st.session_state.bowlers:
-    st.info("Please add at least one batsman and one bowler to begin.")
-    st.stop()
+conn.commit()
 
-# Choose batsman to update
-selected_batsman = st.selectbox("🎯 Select Batsman", st.session_state.batsmen)
+--- Sidebar: Add Players ---
 
-st.subheader(f"🔄 Delivery Tracking for: {selected_batsman}")
-for bowler in st.session_state.bowlers:
-    with st.expander(f"🎳 {bowler}"):
-        cols = st.columns(len(CATEGORIES))
-        for i, cat in enumerate(CATEGORIES):
-            key = f"{selected_batsman}_{bowler}_{cat}"
-            current_val = st.session_state.stats[selected_batsman][bowler][cat]
-            updated_val = cols[i].number_input(
-                label=cat,
-                min_value=0,
-                step=1,
-                value=current_val,
-                key=key
-            )
-            st.session_state.stats[selected_batsman][bowler][cat] = updated_val
+st.sidebar.header("Add Players") new_batsman = st.sidebar.text_input("New Batsman Name") if st.sidebar.button("Add Batsman"): if new_batsman: cursor.execute("INSERT OR IGNORE INTO players VALUES (?, 'batsman')", (new_batsman.strip(),)) conn.commit()
 
-# Generate and display table
-st.subheader("📊 Summary Table")
+new_bowler = st.sidebar.text_input("New Bowler Name") if st.sidebar.button("Add Bowler"): if new_bowler: cursor.execute("INSERT OR IGNORE INTO players VALUES (?, 'bowler')", (new_bowler.strip(),)) conn.commit()
 
-data = []
-for bowler in st.session_state.bowlers:
-    stats = st.session_state.stats[selected_batsman][bowler]
-    row = {"Bowler": bowler}
-    row.update({cat: stats[cat] for cat in CATEGORIES})
-    data.append(row)
+--- Main Title ---
 
-df = pd.DataFrame(data)
-total_beaten = df["Beaten"].sum()
-total_wickets = df["Wicket"].sum()
+st.title("🏏 Cricket Player Stats Tracker")
 
-st.dataframe(df, use_container_width=True)
+--- Batsman Selection ---
 
-# Plot
-fig, ax = plt.subplots(figsize=(10, 6))
-x = range(len(df))
-bar_w = 0.15
+cursor.execute("SELECT name FROM players WHERE type='batsman'") batsmen = [row[0] for row in cursor.fetchall()] selected_batsman = st.selectbox("Select a Batsman to Edit/View Stats", batsmen)
 
-for i, cat in enumerate(CATEGORIES):
-    ax.bar([xi + (i - 2) * bar_w for xi in x], df[cat], width=bar_w, label=cat)
+if selected_batsman: cursor.execute("SELECT name FROM players WHERE type='bowler'") bowlers = [row[0] for row in cursor.fetchall()]
 
-ax.set_xticks(list(x))
-ax.set_xticklabels(df["Bowler"])
-ax.set_ylabel("Count")
-ax.set_title(f"{selected_batsman} vs Bowlers")
-ax.text(
-    x=(len(df)-1)/2,
-    y=df[CATEGORIES].values.max() + 1 if not df.empty else 1,
-    s=f"Total Beaten: {total_beaten} | Total Wickets: {total_wickets}",
-    ha="center",
-    fontweight="bold"
-)
-ax.legend()
-st.pyplot(fig)
+for bowler in bowlers:
+    with st.expander(f"Stats vs {bowler}"):
+        cursor.execute("SELECT * FROM stats WHERE batsman=? AND bowler=?", (selected_batsman, bowler))
+        row = cursor.fetchone()
+        current = {
+            "beaten": row[2] if row else 0,
+            "wicket": row[3] if row else 0,
+            "pace_wide": row[4] if row else 0,
+            "spin_wide": row[5] if row else 0,
+            "no_ball": row[6] if row else 0,
+        }
 
-# Export CSV
-csv = df.to_csv(index=False).encode("utf-8")
-st.download_button("💾 Download CSV", csv, file_name=f"{selected_batsman}_stats.csv", mime="text/csv")
+        beaten = st.number_input("Beaten Deliveries", min_value=0, value=current["beaten"], key=f"{bowler}_beaten")
+        wicket = st.number_input("Wickets", min_value=0, value=current["wicket"], key=f"{bowler}_wicket")
+        pace_wide = st.number_input("Pace Wides", min_value=0, value=current["pace_wide"], key=f"{bowler}_pace")
+        spin_wide = st.number_input("Spin Wides", min_value=0, value=current["spin_wide"], key=f"{bowler}_spin")
+        no_ball = st.number_input("No Balls", min_value=0, value=current["no_ball"], key=f"{bowler}_noball")
+
+        if st.button("Save Stats", key=f"save_{bowler}"):
+            cursor.execute('''
+                INSERT OR REPLACE INTO stats
+                (batsman, bowler, beaten, wicket, pace_wide, spin_wide, no_ball)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (selected_batsman, bowler, beaten, wicket, pace_wide, spin_wide, no_ball))
+            conn.commit()
+            st.success(f"Stats for {selected_batsman} vs {bowler} saved!")
+
+--- Summary Table ---
+
+st.subheader("📊 Summary of All Batsmen") cursor.execute(''' SELECT batsman, SUM(beaten) as Total_Beaten, SUM(wicket) as Total_Wickets, SUM(pace_wide) as Total_Pace_Wide, SUM(spin_wide) as Total_Spin_Wide, SUM(no_ball) as Total_No_Balls FROM stats GROUP BY batsman ''') summary_rows = cursor.fetchall()
+
+if summary_rows: summary_df = pd.DataFrame(summary_rows, columns=[ "Batsman", "Total Beaten", "Total Wickets", "Total Pace Wides", "Total Spin Wides", "Total No Balls"]) st.dataframe(summary_df) else: st.info("No summary data available yet. Start by adding stats.")
+
