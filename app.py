@@ -51,8 +51,17 @@ with col_b:
 
 # --- Enter Bowler Stats ---
 if selected_batsman:
-    st.markdown("### Add Bowler and Enter Stats")
-    bowler_name = st.text_input("Enter Bowler Name")
+    st.markdown("### Add or Modify Bowler Stats")
+    cursor.execute("SELECT bowler FROM stats WHERE batsman = ?", (selected_batsman,))
+    existing_bowlers = [row[0] for row in cursor.fetchall()]
+
+    bowler_option = st.selectbox("Select Existing Bowler or Add New", existing_bowlers + ["Add New Bowler"])
+    if bowler_option == "Add New Bowler":
+        new_bowler = st.text_input("Enter New Bowler Name")
+        bowler_name = new_bowler.strip() if new_bowler else None
+    else:
+        bowler_name = bowler_option
+
     if bowler_name:
         cursor.execute("SELECT * FROM stats WHERE batsman=? AND bowler=?", (selected_batsman, bowler_name))
         row = cursor.fetchone()
