@@ -10,8 +10,7 @@ cursor = conn.cursor()
 # Create tables
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS players (
-    name TEXT PRIMARY KEY,
-    type TEXT CHECK(type IN ('batsman'))
+    name TEXT PRIMARY KEY
 )
 ''')
 
@@ -60,17 +59,16 @@ if selected_batsman:
             "no_ball": row[6] if row else 0,
         }
 
-        col1, col2, col3, col4, col5 = st.columns(5)
-        with col1:
-            beaten = st.number_input("Beaten", min_value=0, value=current["beaten"], key=f"{bowler_name}_beaten")
-        with col2:
-            wicket = st.number_input("Wickets", min_value=0, value=current["wicket"], key=f"{bowler_name}_wicket")
-        with col3:
-            pace_wide = st.number_input("Pace Wide", min_value=0, value=current["pace_wide"], key=f"{bowler_name}_pace")
-        with col4:
-            spin_wide = st.number_input("Spin Wide", min_value=0, value=current["spin_wide"], key=f"{bowler_name}_spin")
-        with col5:
-            no_ball = st.number_input("No Balls", min_value=0, value=current["no_ball"], key=f"{bowler_name}_noball")
+        with st.container():
+            col1, col2, col3 = st.columns([1, 1, 1])
+            with col1:
+                beaten = st.number_input("Beaten", min_value=0, value=current["beaten"], key=f"{bowler_name}_beaten")
+                pace_wide = st.number_input("Pace Wide", min_value=0, value=current["pace_wide"], key=f"{bowler_name}_pace")
+            with col2:
+                wicket = st.number_input("Wickets", min_value=0, value=current["wicket"], key=f"{bowler_name}_wicket")
+                spin_wide = st.number_input("Spin Wide", min_value=0, value=current["spin_wide"], key=f"{bowler_name}_spin")
+            with col3:
+                no_ball = st.number_input("No Balls", min_value=0, value=current["no_ball"], key=f"{bowler_name}_noball")
 
         if st.button("Save Stats", key=f"save_{bowler_name}"):
             cursor.execute('''
