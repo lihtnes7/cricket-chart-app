@@ -46,38 +46,42 @@ batsmen = [row[0] for row in cursor.fetchall()]
 selected_batsman = st.selectbox("Select a Batsman to Edit/View Stats", batsmen)
 
 if selected_batsman:
-    st.markdown("### Add Bowler and Enter Stats")
-    bowler_name = st.text_input("Bowler Name")
-    if bowler_name:
-        cursor.execute("SELECT * FROM stats WHERE batsman=? AND bowler=?", (selected_batsman, bowler_name))
-        row = cursor.fetchone()
-        current = {
-            "beaten": row[2] if row else 0,
-            "wicket": row[3] if row else 0,
-            "pace_wide": row[4] if row else 0,
-            "spin_wide": row[5] if row else 0,
-            "no_ball": row[6] if row else 0,
-        }
+    st.markdown("### Add Multiple Bowlers and Enter Stats")
+    num_bowlers = st.number_input("How many bowlers to add?", min_value=1, max_value=10, value=1)
 
-        with st.container():
-            col1, col2, col3 = st.columns([1, 1, 1])
-            with col1:
-                beaten = st.number_input("Beaten", min_value=0, value=current["beaten"], key=f"{bowler_name}_beaten")
-                pace_wide = st.number_input("Pace Wide", min_value=0, value=current["pace_wide"], key=f"{bowler_name}_pace")
-            with col2:
-                wicket = st.number_input("Wickets", min_value=0, value=current["wicket"], key=f"{bowler_name}_wicket")
-                spin_wide = st.number_input("Spin Wide", min_value=0, value=current["spin_wide"], key=f"{bowler_name}_spin")
-            with col3:
-                no_ball = st.number_input("No Balls", min_value=0, value=current["no_ball"], key=f"{bowler_name}_noball")
+    for i in range(num_bowlers):
+        with st.expander(f"Bowler {i+1} Stats", expanded=False):
+            bowler_name = st.text_input(f"Bowler {i+1} Name", key=f"bowler_name_{i}")
+            if bowler_name:
+                cursor.execute("SELECT * FROM stats WHERE batsman=? AND bowler=?", (selected_batsman, bowler_name))
+                row = cursor.fetchone()
+                current = {
+                    "beaten": row[2] if row else 0,
+                    "wicket": row[3] if row else 0,
+                    "pace_wide": row[4] if row else 0,
+                    "spin_wide": row[5] if row else 0,
+                    "no_ball": row[6] if row else 0,
+                }
 
-        if st.button("Save Stats", key=f"save_{bowler_name}"):
-            cursor.execute('''
-                INSERT OR REPLACE INTO stats
-                (batsman, bowler, beaten, wicket, pace_wide, spin_wide, no_ball)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (selected_batsman, bowler_name, beaten, wicket, pace_wide, spin_wide, no_ball))
-            conn.commit()
-            st.success(f"Stats for {selected_batsman} vs {bowler_name} saved!")
+                with st.container():
+                    col1, col2, col3 = st.columns([1, 1, 1])
+                    with col1:
+                        beaten = st.number_input("Beaten", min_value=0, value=current["beaten"], key=f"{bowler_name}_beaten")
+                        pace_wide = st.number_input("Pace Wide", min_value=0, value=current["pace_wide"], key=f"{bowler_name}_pace")
+                    with col2:
+                        wicket = st.number_input("Wickets", min_value=0, value=current["wicket"], key=f"{bowler_name}_wicket")
+                        spin_wide = st.number_input("Spin Wide", min_value=0, value=current["spin_wide"], key=f"{bowler_name}_spin")
+                    with col3:
+                        no_ball = st.number_input("No Balls", min_value=0, value=current["no_ball"], key=f"{bowler_name}_noball")
+
+                if st.button("Save Stats", key=f"save_{bowler_name}"):
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO stats
+                        (batsman, bowler, beaten, wicket, pace_wide, spin_wide, no_ball)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''', (selected_batsman, bowler_name, beaten, wicket, pace_wide, spin_wide, no_ball))
+                    conn.commit()
+                    st.success(f"Stats for {selected_batsman} vs {bowler_name} saved!")
 
 # --- Visualization ---
 st.subheader("📈 Visualize Batsman's Stats")
