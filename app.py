@@ -74,24 +74,27 @@ if selected_batsman:
         }
 
         with st.expander(f"Stats for {bowler_name} vs {selected_batsman}", expanded=False):
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4, col5, col6 = st.columns(6)
             with col1:
                 beaten = st.number_input("Beaten", min_value=0, value=current["beaten"], key=f"{bowler_name}_beaten")
-                pace_wide = st.number_input("Pace Wide", min_value=0, value=current["pace_wide"], key=f"{bowler_name}_pace")
             with col2:
                 wicket = st.number_input("Wickets", min_value=0, value=current["wicket"], key=f"{bowler_name}_wicket")
-                spin_wide = st.number_input("Spin Wide", min_value=0, value=current["spin_wide"], key=f"{bowler_name}_spin")
             with col3:
+                pace_wide = st.number_input("Pace Wide", min_value=0, value=current["pace_wide"], key=f"{bowler_name}_pace")
+            with col4:
+                spin_wide = st.number_input("Spin Wide", min_value=0, value=current["spin_wide"], key=f"{bowler_name}_spin")
+            with col5:
                 no_ball = st.number_input("No Balls", min_value=0, value=current["no_ball"], key=f"{bowler_name}_noball")
-
-            if st.button("Save Stats", key=f"save_{bowler_name}"):
-                cursor.execute('''
-                    INSERT OR REPLACE INTO stats
-                    (batsman, bowler, beaten, wicket, pace_wide, spin_wide, no_ball)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (selected_batsman, bowler_name, beaten, wicket, pace_wide, spin_wide, no_ball))
-                conn.commit()
-                st.success(f"Stats saved for {bowler_name} vs {selected_batsman}")
+            with col6:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("Save Stats", key=f"save_{bowler_name}"):
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO stats
+                        (batsman, bowler, beaten, wicket, pace_wide, spin_wide, no_ball)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''', (selected_batsman, bowler_name, beaten, wicket, pace_wide, spin_wide, no_ball))
+                    conn.commit()
+                    st.success(f"Stats saved for {bowler_name} vs {selected_batsman}")
 
 # --- Visualization ---
 st.markdown("### 📊 Visualize Batsman's Stats")
