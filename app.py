@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
+import altair as alt
 
 # --- Database setup ---
 conn = sqlite3.connect("cricket_stats.db", check_same_thread=False)
@@ -10,7 +11,7 @@ cursor = conn.cursor()
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS players (
     name TEXT PRIMARY KEY,
-    type TEXT CHECK(type IN ('batsman', 'bowler'))
+    type TEXT CHECK(type IN ('batsman'))
 )
 ''')
 
@@ -30,57 +31,75 @@ CREATE TABLE IF NOT EXISTS stats (
 conn.commit()
 
 # --- Sidebar: Add Players ---
-st.sidebar.header("Add Players")
+st.sidebar.header("Add Batsman")
 new_batsman = st.sidebar.text_input("New Batsman Name")
 if st.sidebar.button("Add Batsman"):
     if new_batsman:
-        cursor.execute("INSERT OR IGNORE INTO players VALUES (?, 'batsman')", (new_batsman.strip(),))
-        conn.commit()
-
-new_bowler = st.sidebar.text_input("New Bowler Name")
-if st.sidebar.button("Add Bowler"):
-    if new_bowler:
-        cursor.execute("INSERT OR IGNORE INTO players VALUES (?, 'bowler')", (new_bowler.strip(),))
+        cursor.execute("INSERT OR IGNORE INTO players VALUES (?)", (new_batsman.strip(),))
         conn.commit()
 
 # --- Main Title ---
 st.title("🏏 Cricket Player Stats Tracker")
 
 # --- Batsman Selection ---
-cursor.execute("SELECT name FROM players WHERE type='batsman'")
+cursor.execute("SELECT name FROM players")
 batsmen = [row[0] for row in cursor.fetchall()]
 selected_batsman = st.selectbox("Select a Batsman to Edit/View Stats", batsmen)
 
 if selected_batsman:
-    cursor.execute("SELECT name FROM players WHERE type='bowler'")
-    bowlers = [row[0] for row in cursor.fetchall()]
+    st.markdown("### Add Bowler and Enter Stats")
+    bowler_name = st.text_input("Bowler Name")
+    if bowler_name:
+        cursor.execute("SELECT * FROM stats WHERE batsman=? AND bowler=?", (selected_batsman, bowler_name))
+        row = cursor.fetchone()
+        current = {
+            "beaten": row[2] if row else 0,
+            "wicket": row[3] if row else 0,
+            "pace_wide": row[4] if row else 0,
+            "spin_wide": row[5] if row else 0,
+            "no_ball": row[6] if row else 0,
+        }
 
-    for bowler in bowlers:
-        with st.expander(f"Stats vs {bowler}"):
-            cursor.execute("SELECT * FROM stats WHERE batsman=? AND bowler=?", (selected_batsman, bowler))
-            row = cursor.fetchone()
-            current = {
-                "beaten": row[2] if row else 0,
-                "wicket": row[3] if row else 0,
-                "pace_wide": row[4] if row else 0,
-                "spin_wide": row[5] if row else 0,
-                "no_ball": row[6] if row else 0,
-            }
+        col1, col2, col3, col4, col5 = st.columns(5)
+        with col1:
+            beaten = st.number_input("Beaten", min_value=0, value=current["beaten"], key=f"{bowler_name}_beaten")
+        with col2:
+            wicket = st.number_input("Wickets", min_value=0, value=current["wicket"], key=f"{bowler_name}_wicket")
+        with col3:
+            pace_wide = st.number_input("Pace Wide", min_value=0, value=current["pace_wide"], key=f"{bowler_name}_pace")
+        with col4:
+            spin_wide = st.number_input("Spin Wide", min_value=0, value=current["spin_wide"], key=f"{bowler_name}_spin")
+        with col5:
+            no_ball = st.number_input("No Balls", min_value=0, value=current["no_ball"], key=f"{bowler_name}_noball")
 
-            beaten = st.number_input("Beaten Deliveries", min_value=0, value=current["beaten"], key=f"{bowler}_beaten")
-            wicket = st.number_input("Wickets", min_value=0, value=current["wicket"], key=f"{bowler}_wicket")
-            pace_wide = st.number_input("Pace Wides", min_value=0, value=current["pace_wide"], key=f"{bowler}_pace")
-            spin_wide = st.number_input("Spin Wides", min_value=0, value=current["spin_wide"], key=f"{bowler}_spin")
-            no_ball = st.number_input("No Balls", min_value=0, value=current["no_ball"], key=f"{bowler}_noball")
+        if st.button("Save Stats", key=f"save_{bowler_name}"):
+            cursor.execute('''
+                INSERT OR REPLACE INTO stats
+                (batsman, bowler, beaten, wicket, pace_wide, spin_wide, no_ball)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (selected_batsman, bowler_name, beaten, wicket, pace_wide, spin_wide, no_ball))
+            conn.commit()
+            st.success(f"Stats for {selected_batsman} vs {bowler_name} saved!")
 
-            if st.button("Save Stats", key=f"save_{bowler}"):
-                cursor.execute('''
-                    INSERT OR REPLACE INTO stats
-                    (batsman, bowler, beaten, wicket, pace_wide, spin_wide, no_ball)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (selected_batsman, bowler, beaten, wicket, pace_wide, spin_wide, no_ball))
-                conn.commit()
-                st.success(f"Stats for {selected_batsman} vs {bowler} saved!")
+# --- Visualization ---
+st.subheader("📈 Visualize Batsman's Stats")
+selected_batsman_viz = st.selectbox("Select a Batsman to Visualize", batsmen, key="viz")
+if selected_batsman_viz:
+    df_viz = pd.read_sql_query("SELECT * FROM stats WHERE batsman = ?", conn, params=(selected_batsman_viz,))
+    if not df_viz.empty:
+        df_melt = df_viz.melt(id_vars=["bowler"], value_vars=["beaten", "wicket", "pace_wide", "spin_wide", "no_ball"], 
+                              var_name="Metric", value_name="Count")
+
+        chart = alt.Chart(df_melt).mark_bar().encode(
+            x=alt.X('bowler:N', title="Bowler"),
+            y=alt.Y('Count:Q'),
+            color='Metric:N',
+            column='Metric:N'
+        ).properties(height=300)
+
+        st.altair_chart(chart, use_container_width=True)
+    else:
+        st.info("No data to visualize for this batsman.")
 
 # --- Summary Table ---
 st.subheader("📊 Summary of All Batsmen")
