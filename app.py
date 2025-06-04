@@ -98,18 +98,3 @@ if summary_rows:
     st.dataframe(summary_df)
 else:
     st.info("No summary data available yet. Start by adding stats.")
-
-
-✅ The app is now fully updated with:
-
-Dynamic batsman and bowler input fields
-
-SQLite database for persistent tracking
-
-Per-bowler stat counters
-
-A summary table showing totals for all batsmen
-
-
-This is ready to be hosted or pushed to GitHub. Let me know if you'd like a requirements.txt, a GitHub-ready structure, or deployment instructions via Streamlit Cloud or locally.
-
