@@ -50,40 +50,35 @@ if st.button("Add Bowler") and new_bowler:
 # Select bowler to update
 selected_bowler = st.selectbox("Select Bowler to Update", st.session_state.bowlers)
 
-# Counter buttons
+# Counter widgets
 if selected_bowler:
     st.markdown(f"### Stats for {selected_bowler} vs {st.session_state.current_batsman}")
+
+    # Fetch current values or set defaults
+    c.execute("SELECT * FROM stats WHERE batsman=? AND bowler=?", (st.session_state.current_batsman, selected_bowler))
+    row = c.fetchone()
+    if row:
+        beaten, wicket, pace_wide, spin_wide, no_ball = row[2:]
+    else:
+        beaten = wicket = pace_wide = spin_wide = no_ball = 0
+
     col1, col2, col3, col4, col5 = st.columns(5)
 
-    def update_stat(column, delta):
-        c.execute(f"SELECT {column} FROM stats WHERE batsman=? AND bowler=?", 
-                  (st.session_state.current_batsman, selected_bowler))
-        row = c.fetchone()
-        current_value = row[0] if row else 0
-        new_value = max(current_value + delta, 0)
-        if row:
-            c.execute(f"UPDATE stats SET {column}=? WHERE batsman=? AND bowler=?", 
-                      (new_value, st.session_state.current_batsman, selected_bowler))
-        else:
-            c.execute("INSERT INTO stats (batsman, bowler, " + column + ") VALUES (?, ?, ?)", 
-                      (st.session_state.current_batsman, selected_bowler, max(0, delta)))
-        conn.commit()
-
     with col1:
-        st.button("+ Beaten", on_click=update_stat, args=("beaten", 1))
-        st.button("- Beaten", on_click=update_stat, args=("beaten", -1))
+        new_beaten = st.number_input("Beaten", min_value=0, value=beaten, step=1, key="beaten")
     with col2:
-        st.button("+ Wicket", on_click=update_stat, args=("wicket", 1))
-        st.button("- Wicket", on_click=update_stat, args=("wicket", -1))
+        new_wicket = st.number_input("Wicket", min_value=0, value=wicket, step=1, key="wicket")
     with col3:
-        st.button("+ Pace Wide", on_click=update_stat, args=("pace_wide", 1))
-        st.button("- Pace Wide", on_click=update_stat, args=("pace_wide", -1))
+        new_pace_wide = st.number_input("Pace Wide", min_value=0, value=pace_wide, step=1, key="pace_wide")
     with col4:
-        st.button("+ Spin Wide", on_click=update_stat, args=("spin_wide", 1))
-        st.button("- Spin Wide", on_click=update_stat, args=("spin_wide", -1))
+        new_spin_wide = st.number_input("Spin Wide", min_value=0, value=spin_wide, step=1, key="spin_wide")
     with col5:
-        st.button("+ No Ball", on_click=update_stat, args=("no_ball", 1))
-        st.button("- No Ball", on_click=update_stat, args=("no_ball", -1))
+        new_no_ball = st.number_input("No Ball", min_value=0, value=no_ball, step=1, key="no_ball")
+
+    # Save automatically on change
+    c.execute("REPLACE INTO stats (batsman, bowler, beaten, wicket, pace_wide, spin_wide, no_ball) VALUES (?, ?, ?, ?, ?, ?, ?)",
+              (st.session_state.current_batsman, selected_bowler, new_beaten, new_wicket, new_pace_wide, new_spin_wide, new_no_ball))
+    conn.commit()
 
 # Show counter summary for current batsman and bowler
 if selected_bowler:
