@@ -79,6 +79,13 @@ if selected_bowler:
     if col5.button("No Ball"):
         update_stat("no_ball")
 
+# Show counter summary for current batsman and bowler
+if selected_bowler:
+    st.markdown("#### Current Stats")
+    current_stats = pd.read_sql_query("SELECT * FROM stats WHERE batsman=? AND bowler=?", conn, params=(st.session_state.current_batsman, selected_bowler))
+    if not current_stats.empty:
+        st.dataframe(current_stats.set_index(['batsman', 'bowler']))
+
 # Generate visualization
 st.markdown("### Generate Chart")
 if st.button("Show Chart"):
@@ -124,5 +131,12 @@ if st.button("Download CSV"):
         file_name='cricket_stats.csv',
         mime='text/csv',
     )
+
+# Consolidated stats for all batsmen
+st.markdown("### Consolidated Stats for All Batsmen")
+df_all = pd.read_sql_query("SELECT * FROM stats", conn)
+if not df_all.empty:
+    summary = df_all.groupby("batsman")[['beaten', 'wicket', 'pace_wide', 'spin_wide', 'no_ball']].sum()
+    st.dataframe(summary)
 
 conn.close()
