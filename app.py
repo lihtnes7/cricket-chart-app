@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import altair as alt
+import matplotlib.pyplot as plt
+from io import BytesIO
 
 # --- Database setup ---
 conn = sqlite3.connect("cricket_stats.db", check_same_thread=False)
@@ -90,23 +92,30 @@ if selected_batsman:
             conn.commit()
             st.info("Auto-saved stats on change")
 
-# --- Visualization ---
-st.markdown("### 📊 Visualize Batsman's Stats")
+# --- Visualization as Image ---
+st.markdown("### 📊 Visualize Batsman's Stats as Image")
 selected_batsman_viz = st.selectbox("Select a Batsman to Visualize", batsmen, key="viz")
 if selected_batsman_viz:
     df_viz = pd.read_sql_query("SELECT * FROM stats WHERE batsman = ?", conn, params=(selected_batsman_viz,))
     if not df_viz.empty:
-        df_melt = df_viz.melt(id_vars=["bowler"], value_vars=["beaten", "wicket", "pace_wide", "spin_wide", "no_ball"], 
-                              var_name="Metric", value_name="Count")
+        total_beaten = df_viz['beaten'].sum()
+        total_wickets = df_viz['wicket'].sum()
 
-        chart = alt.Chart(df_melt).mark_bar().encode(
-            x=alt.X('bowler:N', title="Bowler"),
-            y=alt.Y('Count:Q'),
-            color='Metric:N',
-            column='Metric:N'
-        ).properties(height=300)
+        st.markdown(f"**Beaten:** {total_beaten} | **Wickets:** {total_wickets}")
 
-        st.altair_chart(chart, use_container_width=True)
+        metrics = ['beaten', 'wicket', 'pace_wide', 'spin_wide', 'no_ball']
+        fig, axes = plt.subplots(nrows=1, ncols=len(metrics), figsize=(4 * len(metrics), 4))
+        for ax, metric in zip(axes, metrics):
+            ax.bar(df_viz['bowler'], df_viz[metric])
+            ax.set_title(metric.replace("_", " ").title())
+            ax.set_xticklabels(df_viz['bowler'], rotation=45, ha='right')
+
+        plt.tight_layout()
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        st.image(buf.getvalue(), caption=f"Stats Image for {selected_batsman_viz}", use_column_width=True)
+        buf.close()
+        plt.close(fig)
     else:
         st.info("No data to visualize for this batsman.")
 
