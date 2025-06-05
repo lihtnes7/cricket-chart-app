@@ -55,29 +55,35 @@ if selected_bowler:
     st.markdown(f"### Stats for {selected_bowler} vs {st.session_state.current_batsman}")
     col1, col2, col3, col4, col5 = st.columns(5)
 
-    def update_stat(column):
+    def update_stat(column, delta):
         c.execute(f"SELECT {column} FROM stats WHERE batsman=? AND bowler=?", 
                   (st.session_state.current_batsman, selected_bowler))
         row = c.fetchone()
         current_value = row[0] if row else 0
+        new_value = max(current_value + delta, 0)
         if row:
             c.execute(f"UPDATE stats SET {column}=? WHERE batsman=? AND bowler=?", 
-                      (current_value + 1, st.session_state.current_batsman, selected_bowler))
+                      (new_value, st.session_state.current_batsman, selected_bowler))
         else:
             c.execute("INSERT INTO stats (batsman, bowler, " + column + ") VALUES (?, ?, ?)", 
-                      (st.session_state.current_batsman, selected_bowler, 1))
+                      (st.session_state.current_batsman, selected_bowler, max(0, delta)))
         conn.commit()
 
-    if col1.button("Beaten"):
-        update_stat("beaten")
-    if col2.button("Wicket"):
-        update_stat("wicket")
-    if col3.button("Pace Wide"):
-        update_stat("pace_wide")
-    if col4.button("Spin Wide"):
-        update_stat("spin_wide")
-    if col5.button("No Ball"):
-        update_stat("no_ball")
+    with col1:
+        st.button("+ Beaten", on_click=update_stat, args=("beaten", 1))
+        st.button("- Beaten", on_click=update_stat, args=("beaten", -1))
+    with col2:
+        st.button("+ Wicket", on_click=update_stat, args=("wicket", 1))
+        st.button("- Wicket", on_click=update_stat, args=("wicket", -1))
+    with col3:
+        st.button("+ Pace Wide", on_click=update_stat, args=("pace_wide", 1))
+        st.button("- Pace Wide", on_click=update_stat, args=("pace_wide", -1))
+    with col4:
+        st.button("+ Spin Wide", on_click=update_stat, args=("spin_wide", 1))
+        st.button("- Spin Wide", on_click=update_stat, args=("spin_wide", -1))
+    with col5:
+        st.button("+ No Ball", on_click=update_stat, args=("no_ball", 1))
+        st.button("- No Ball", on_click=update_stat, args=("no_ball", -1))
 
 # Show counter summary for current batsman and bowler
 if selected_bowler:
